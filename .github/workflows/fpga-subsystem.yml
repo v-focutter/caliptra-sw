@@ -61,7 +61,7 @@ permissions:
   contents: read
 
 env:
-  CALIPTRA_MCU_COMMIT: ${{ inputs.mcu-commit || '47810a48a4fcf6f80b50bac7a7e6721eb9123d6c' }}
+  CALIPTRA_MCU_COMMIT: ${{ inputs.mcu-commit || '067e8dbdafc36123f99189aa14eba3ee480182ff' }}
 
 jobs:
   check_cache:
@@ -95,7 +95,7 @@ jobs:
 
   check_mcu_commit:
     runs-on: ubuntu-22.04
-    if: github.event_name != 'workflow_dispatch'
+    if: github.repository != 'chipsalliance/caliptra-mcu-sw'
     steps:
       - name: Check MCU Commit validity
         run: |
@@ -121,6 +121,9 @@ jobs:
         with:
           repository: ${{ inputs.repository || 'chipsalliance/caliptra-sw' }}
           ref: ${{ inputs.branch }}
+
+      - name: Pull Caliptra subsystem RTL submodule
+        run: git submodule update --init hw/latest/caliptra-ss
 
       - name: Restore sysroot from cache
         uses: actions/cache/restore@v3
@@ -206,7 +209,14 @@ jobs:
           path: /tmp/caliptra-mcu-binaries.tar.gz
           key: mcu-rom-${{ env.CALIPTRA_MCU_COMMIT }}-${{ env.CACHE_BUSTER }}
 
+      - name: Download MCU fuses.hjson
+        run: |
+          curl -sL "https://raw.githubusercontent.com/chipsalliance/caliptra-mcu-sw/${CALIPTRA_MCU_COMMIT}/hw/fuses.hjson" \
+            -o /tmp/mcu-fuses.hjson
+
       - name: Build test binaries
+        env:
+          CALIPTRA_MCU_FUSES_HJSON: /tmp/mcu-fuses.hjson
         run: |
           export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc"
           export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--sysroot=$FARGO_SYSROOT"
